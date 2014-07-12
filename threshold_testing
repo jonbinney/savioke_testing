@@ -1,0 +1,68 @@
+#! /usr/bin/env python
+
+import rospy
+from geometry_msgs.msg import Twist
+from nav_msgs.msg import Odometry
+import argparse, signal, sys, math
+
+def odomCallback(odom_msg):
+    global g_start_odom, g_last_odom, g_counter
+    if g_counter == 0:
+        g_start_odom = odom_msg
+        g_counter = 1
+    else:
+        g_last_odom = odom_msg
+
+def signal_handler(sig, frame):
+    global g_start_odom, g_last_odom
+    start_x = g_start_odom.pose.pose.position.x
+    start_y = g_start_odom.pose.pose.position.y
+    last_x = g_last_odom.pose.pose.position.x
+    last_y = g_last_odom.pose.pose.position.y
+    total_distance = math.sqrt((last_x - start_x)**2 + (last_y - start_y)**2) 
+    
+    q_start = g_start_odom.pose.pose.orientation
+    q_last = g_last_odom.pose.pose.orientation
+
+    start_theta = math.atan2(2*(q_start.x*q_start.y + q_start.w*q_start.z), q_start.w*q_start.w + q_start.x*q_start.x - q_start.y*q_start.y - q_start.z*q_start.z)
+    last_theta = math.atan2(2*(q_last.x*q_last.y + q_last.w*q_last.z), q_last.w*q_last.w + q_last.x*q_last.x - q_last.y*q_last.y - q_last.z*q_last.z)
+
+    diff_theta = last_theta - start_theta
+
+    print 'Total distance travelled: %f' % total_distance
+    print 'Difference in theta: %f' % diff_theta
+    sys.exit(0)
+
+
+rospy.init_node('threshold_test')
+cmd_vel_pub = rospy.Publisher('cmd_vel', Twist, queue_size=1) 
+rospy.Subscriber('odom', Odometry, odomCallback)
+rate = rospy.Rate(100)
+
+parser = argparse.ArgumentParser()
+parser.add_argument('distance', help="distance to travel", type=float)
+parser.add_argument('cmd_vel', help="desired commanded velocity", type=float)
+args = parser.parse_args()
+
+g_twist = Twist()
+
+g_start_odom = Odometry()
+g_last_odom = Odometry()
+g_counter = 0
+g_twist.linear.x = 0.0
+
+duration = rospy.Duration(args.distance/args.cmd_vel)
+
+start_time = rospy.get_rostime()
+
+g_twist.linear.x = args.cmd_vel
+
+signal.signal(signal.SIGINT, signal_handler)
+
+while not rospy.is_shutdown():
+    if rospy.get_rostime() > start_time + duration:
+        g_twist.linear.x = 0.0
+
+    cmd_vel_pub.publish(g_twist)
+    rate.sleep()
+
