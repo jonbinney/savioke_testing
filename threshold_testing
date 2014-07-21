@@ -31,7 +31,7 @@ g_last_odom = Odometry()
 g_counter = 0
 g_twist.linear.x = 0.0
 
-cmd_vel_pub = rospy.Publisher('cmd_vel', Twist, queue_size=1) 
+cmd_vel_pub = rospy.Publisher('cmd_vel/monitor', Twist, queue_size=2) 
 rospy.Subscriber('odom', Odometry, odomCallback)
 publish_rate = 100 # hz
 rate = rospy.Rate(publish_rate)
@@ -87,8 +87,8 @@ while not rospy.is_shutdown():
 
         diff_theta = last_theta - start_theta
 
-        print 'Total distance travelled: %f' % total_distance
-        print 'Difference in theta: %f' % diff_theta
+        print 'Total distance travelled: %f meters' % total_distance
+        print 'Difference in theta: %f degrees' % (diff_theta * 180. / 3.141592,)
         sys.exit(0)
 
     cmd_vel_pub.publish(g_twist)
